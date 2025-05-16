@@ -1,8 +1,8 @@
 import { handle } from 'hono/vercel'
 import app from '../app'
 
-// Use Node.js runtime since our Hono app uses Node.js features
-export const runtime = 'nodejs'
+// Use Edge Runtime for better performance and compatibility
+export const runtime = 'edge'
 
 // Create a handler that strips the /api prefix before passing to Hono
 const handler = handle(app)
