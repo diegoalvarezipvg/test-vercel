@@ -1,0 +1,670 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+// Módulo Transversal (Usuarios y seguridad)
+model Usuario {
+  id                    Int                     @id @default(autoincrement())
+  nombreUsuario         String                  @unique @map("nombre_usuario")
+  nombre                String
+  apellido              String
+  email                 String                 @unique
+  telefono              String?
+  passwordHash          String                  @map("password_hash")
+  rol                   String
+  estado                String                  @default("Activo")
+  fechaCreacion         DateTime                @default(now()) @map("fecha_creacion")
+  ultimoAcceso          DateTime?               @map("ultimo_acceso")
+  
+  // Relaciones
+  permisos              UsuarioPermiso[]
+  ordenesCompra         OrdenCompra[]           @relation("UsuarioOrdenCompra")
+  recepcionesCompra     RecepcionCompra[]       @relation("UsuarioRecepcionCompra")
+  recetas               Receta[]                @relation("UsuarioReceta")
+  ordenesProduccion     OrdenProduccion[]       @relation("UsuarioOrdenProduccion")
+  parametrosProceso     ParametroProceso[]      @relation("UsuarioParametroProceso")
+  controlCalidad        ControlCalidad[]        @relation("UsuarioControlCalidad")
+  consumoMateriaPrima   ConsumoMateriaPrima[]   @relation("UsuarioConsumoMateriaPrima")
+  pedidos               Pedido[]                @relation("UsuarioPedido")
+  ventas                Venta[]                 @relation("UsuarioVenta")
+  devoluciones          Devolucion[]            @relation("UsuarioDevolucion")
+  gastos                Gasto[]                 @relation("UsuarioGasto")
+  movimientosInventario MovimientoInventario[]  @relation("UsuarioMovimientoInventario")
+  logAuditoria          LogAuditoria[]          @relation("UsuarioLogAuditoria")
+  
+  @@map("usuarios")
+}
+
+model Permiso {
+  id              Int               @id @default(autoincrement())
+  nombrePermiso   String            @unique @map("nombre_permiso")
+  modulo          String
+  descripcion     String?
+  
+  // Relaciones
+  usuarios        UsuarioPermiso[]
+  
+  @@map("permisos")
+}
+
+model UsuarioPermiso {
+  id              Int       @id @default(autoincrement())
+  usuarioId       Int       @map("usuario_id")
+  permisoId       Int       @map("permiso_id")
+  
+  // Relaciones
+  usuario         Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  permiso         Permiso   @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+  
+  @@unique([usuarioId, permisoId])
+  @@map("usuarios_permisos")
+}
+
+model LogAuditoria {
+  id               Int       @id @default(autoincrement())
+  fecha            DateTime  @default(now())
+  usuarioId        Int?      @map("usuario_id")
+  accion           String
+  modulo           String
+  entidad          String
+  entidadId        Int?      @map("entidad_id")
+  valorAnterior    String?   @map("valor_anterior")
+  valorNuevo       String?   @map("valor_nuevo")
+  ip               String?
+  
+  // Relaciones
+  usuario          Usuario?  @relation("UsuarioLogAuditoria", fields: [usuarioId], references: [id], onDelete: SetNull)
+  
+  @@map("log_auditoria")
+}
+
+// Módulo de Inventario
+model MateriaPrima {
+  id                   Int                      @id @default(autoincrement())
+  codigo               String
+  nombre               String
+  tipo                 String
+  subtipo              String?
+  unidadMedida         String                   @map("unidad_medida")
+  stockActual          Decimal                  @default(0) @map("stock_actual")
+  stockMinimo          Decimal                  @default(0) @map("stock_minimo")
+  ubicacionFisica      String?                  @map("ubicacion_fisica")
+  atributosEspecificos Json?                    @map("atributos_especificos")
+  estado               String                   @default("Activo")
+  notas                String?
+  fechaCreacion        DateTime                 @default(now()) @map("fecha_creacion")
+  fechaModificacion    DateTime?                @map("fecha_modificacion")
+  
+  // Relaciones
+  lotes                LoteMateriaPrima[]
+  detallesReceta       DetalleReceta[]
+  detallesOrdenCompra  DetalleOrdenCompra[]
+  detallesRecepcion    DetalleRecepcionCompra[]
+  consumos             ConsumoMateriaPrima[]
+  
+  @@map("materias_primas")
+}
+
+model ProductoTerminado {
+  id                 Int              @id @default(autoincrement())
+  codigo             String
+  nombre             String
+  estilo             String
+  descripcion        String?
+  presentacion       String
+  capacidad          Decimal
+  unidadMedida       String           @map("unidad_medida")
+  stockActual        Decimal          @default(0) @map("stock_actual")
+  stockMinimo        Decimal          @default(0) @map("stock_minimo")
+  precioBase         Decimal?         @map("precio_base")
+  estado             String           @default("Activo")
+  imagen             String?
+  notas              String?
+  fechaCreacion      DateTime         @default(now()) @map("fecha_creacion")
+  fechaModificacion  DateTime?        @map("fecha_modificacion")
+  
+  // Relaciones
+  recetas            Receta[]
+  lotes              LoteProducto[]
+  detallesPedido     DetallePedido[]
+  detallesVenta      DetalleVenta[]
+  detallesDevolucion DetalleDevolucion[]
+  
+  @@map("productos_terminados")
+}
+
+model LoteMateriaPrima {
+  id                    Int                      @id @default(autoincrement())
+  materiaPrimaId        Int                      @map("materia_prima_id")
+  codigoLote            String                   @map("codigo_lote")
+  proveedorId           Int                      @map("proveedor_id")
+  fechaRecepcion        DateTime                 @map("fecha_recepcion")
+  fechaProduccion       DateTime?                @map("fecha_produccion")
+  fechaCaducidad        DateTime?                @map("fecha_caducidad")
+  cantidad              Decimal
+  cantidadDisponible    Decimal                  @map("cantidad_disponible")
+  precio                Decimal?
+  ordenCompraId         Int?                     @map("orden_compra_id")
+  estado                String                   @default("Disponible")
+  notas                 String?
+  
+  // Relaciones
+  materiaPrima          MateriaPrima             @relation(fields: [materiaPrimaId], references: [id])
+  proveedor             Proveedor                @relation(fields: [proveedorId], references: [id])
+  ordenCompra           OrdenCompra?             @relation(fields: [ordenCompraId], references: [id])
+  detallesRecepcion     DetalleRecepcionCompra[]
+  consumos              ConsumoMateriaPrima[]
+  
+  @@map("lotes_materia_prima")
+}
+
+model MovimientoInventario {
+  id                    Int       @id @default(autoincrement())
+  fecha                 DateTime  @default(now())
+  tipoMovimiento        String    @map("tipo_movimiento")
+  tipoElemento          String    @map("tipo_elemento")
+  elementoId            Int       @map("elemento_id")
+  loteId                Int?      @map("lote_id")
+  cantidad              Decimal
+  unidadMedida          String    @map("unidad_medida")
+  documentoReferencia   String?   @map("documento_referencia")
+  referenciaId          Int?      @map("referencia_id")
+  motivo                String?
+  usuarioId             Int       @map("usuario_id")
+  notas                 String?
+  
+  // Relaciones
+  usuario               Usuario   @relation("UsuarioMovimientoInventario", fields: [usuarioId], references: [id])
+  
+  @@map("movimientos_inventario")
+}
+
+// Módulo Administrativo
+model Proveedor {
+  id                 Int                  @id @default(autoincrement())
+  codigo             String
+  nombre             String
+  tipo               String
+  contacto           String?
+  telefono           String?
+  email              String?
+  direccion          String?
+  comuna             String?
+  ciudad             String?
+  pais               String?
+  condicionPago      String?              @map("condicion_pago")
+  estado             String               @default("Activo")
+  calificacion       Int?
+  fechaRegistro      DateTime             @default(now()) @map("fecha_registro")
+  notas              String?
+  
+  // Relaciones
+  ordenesCompra      OrdenCompra[]
+  lotesMateriaPrima  LoteMateriaPrima[]
+  
+  @@map("proveedores")
+}
+
+model OrdenCompra {
+  id                      Int                      @id @default(autoincrement())
+  codigo                  String
+  proveedorId             Int                      @map("proveedor_id")
+  fechaEmision            DateTime                 @default(now()) @map("fecha_emision")
+  fechaEntregaEsperada    DateTime?                @map("fecha_entrega_esperada")
+  estado                  String                   @default("Borrador")
+  subtotal                Decimal                  @default(0)
+  impuestos               Decimal                  @default(0)
+  total                   Decimal                  @default(0)
+  usuarioRegistroId       Int                      @map("usuario_registro_id")
+  notas                   String?
+  
+  // Relaciones
+  proveedor               Proveedor                @relation(fields: [proveedorId], references: [id])
+  usuarioRegistro         Usuario                  @relation("UsuarioOrdenCompra", fields: [usuarioRegistroId], references: [id])
+  detalles                DetalleOrdenCompra[]
+  recepciones             RecepcionCompra[]
+  lotesMateriaPrima       LoteMateriaPrima[]
+  
+  @@map("ordenes_compra")
+}
+
+model DetalleOrdenCompra {
+  id                      Int                      @id @default(autoincrement())
+  ordenCompraId           Int                      @map("orden_compra_id")
+  materiaPrimaId          Int                      @map("materia_prima_id")
+  cantidad                Decimal
+  unidadMedida            String                   @map("unidad_medida")
+  precioUnitario          Decimal                  @map("precio_unitario")
+  subtotal                Decimal
+  notas                   String?
+  
+  // Relaciones
+  ordenCompra             OrdenCompra              @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
+  materiaPrima            MateriaPrima             @relation(fields: [materiaPrimaId], references: [id])
+  detallesRecepcion       DetalleRecepcionCompra[]
+  
+  @@map("detalles_orden_compra")
+}
+
+model RecepcionCompra {
+  id                      Int                      @id @default(autoincrement())
+  ordenCompraId           Int                      @map("orden_compra_id")
+  fechaRecepcion          DateTime                 @default(now()) @map("fecha_recepcion")
+  documentoReferencia     String?                  @map("documento_referencia")
+  estado                  String                   @default("Pendiente")
+  usuarioRegistroId       Int                      @map("usuario_registro_id")
+  notas                   String?
+  
+  // Relaciones
+  ordenCompra             OrdenCompra              @relation(fields: [ordenCompraId], references: [id])
+  usuarioRegistro         Usuario                  @relation("UsuarioRecepcionCompra", fields: [usuarioRegistroId], references: [id])
+  detalles                DetalleRecepcionCompra[]
+  
+  @@map("recepciones_compra")
+}
+
+model DetalleRecepcionCompra {
+  id                      Int                @id @default(autoincrement())
+  recepcionCompraId       Int                @map("recepcion_compra_id")
+  detalleOrdenCompraId    Int                @map("detalle_orden_compra_id")
+  materiaPrimaId          Int                @map("materia_prima_id")
+  loteMateriaPrimaId      Int                @map("lote_materia_prima_id")
+  cantidad                Decimal
+  unidadMedida            String             @map("unidad_medida")
+  loteProveedor           String?            @map("lote_proveedor")
+  fechaProduccion         DateTime?          @map("fecha_produccion")
+  fechaCaducidad          DateTime?          @map("fecha_caducidad")
+  notas                   String?
+  
+  // Relaciones
+  recepcionCompra         RecepcionCompra    @relation(fields: [recepcionCompraId], references: [id], onDelete: Cascade)
+  detalleOrdenCompra      DetalleOrdenCompra @relation(fields: [detalleOrdenCompraId], references: [id])
+  materiaPrima            MateriaPrima       @relation(fields: [materiaPrimaId], references: [id])
+  loteMateriaPrima        LoteMateriaPrima   @relation(fields: [loteMateriaPrimaId], references: [id])
+  
+  @@map("detalles_recepcion_compra")
+}
+
+model CentroCosto {
+  id                Int       @id @default(autoincrement())
+  codigo            String
+  nombre            String
+  tipo              String
+  descripcion       String?
+  estado            String    @default("Activo")
+  
+  // Relaciones
+  gastos            Gasto[]
+  
+  @@map("centro_costos")
+}
+
+model Gasto {
+  id                  Int          @id @default(autoincrement())
+  fechaGasto          DateTime     @map("fecha_gasto")
+  centroCostoId       Int          @map("centro_costo_id")
+  categoria           String
+  descripcion         String
+  monto               Decimal
+  comprobante         String?
+  usuarioRegistroId   Int          @map("usuario_registro_id")
+  notas               String?
+  
+  // Relaciones
+  centroCosto         CentroCosto  @relation(fields: [centroCostoId], references: [id])
+  usuarioRegistro     Usuario      @relation("UsuarioGasto", fields: [usuarioRegistroId], references: [id])
+  
+  @@map("gastos")
+}
+
+// Módulo de Producción
+model Receta {
+  id                    Int                 @id @default(autoincrement())
+  codigo                String
+  nombre                String
+  estilo                String
+  version               String
+  productoTerminadoId   Int                 @map("producto_terminado_id")
+  descripcion           String?
+  volumenFinal          Decimal             @map("volumen_final")
+  unidadVolumen         String              @map("unidad_volumen")
+  instrucciones         String?
+  parametrosTeoricos    Json?               @map("parametros_teoricos")
+  rendimientoEsperado   Decimal?            @map("rendimiento_esperado")
+  estado                String              @default("Activo")
+  usuarioCreadorId      Int                 @map("usuario_creador_id")
+  fechaCreacion         DateTime            @default(now()) @map("fecha_creacion")
+  fechaModificacion     DateTime?           @map("fecha_modificacion")
+  notas                 String?
+  
+  // Relaciones
+  productoTerminado     ProductoTerminado   @relation(fields: [productoTerminadoId], references: [id])
+  usuarioCreador        Usuario             @relation("UsuarioReceta", fields: [usuarioCreadorId], references: [id])
+  detalles              DetalleReceta[]
+  ordenesProduccion     OrdenProduccion[]
+  
+  @@unique([codigo, version])
+  @@map("recetas")
+}
+
+model DetalleReceta {
+  id                  Int           @id @default(autoincrement())
+  recetaId            Int           @map("receta_id")
+  materiaPrimaId      Int           @map("materia_prima_id")
+  etapaProduccion     String        @map("etapa_produccion")
+  cantidad            Decimal
+  unidadMedida        String        @map("unidad_medida")
+  tiempoAdicion       Int?          @map("tiempo_adicion")
+  unidadTiempo        String?       @map("unidad_tiempo")
+  notas               String?
+  orden               Int
+  
+  // Relaciones
+  receta              Receta        @relation(fields: [recetaId], references: [id], onDelete: Cascade)
+  materiaPrima        MateriaPrima  @relation(fields: [materiaPrimaId], references: [id])
+  
+  @@map("detalles_receta")
+}
+
+model OrdenProduccion {
+  id                    Int                @id @default(autoincrement())
+  codigo                String
+  recetaId              Int                @map("receta_id")
+  fechaProgramada       DateTime           @map("fecha_programada")
+  volumenProgramado     Decimal            @map("volumen_programado")
+  unidadVolumen         String             @map("unidad_volumen")
+  estado                String             @default("Programada")
+  usuarioResponsableId  Int                @map("usuario_responsable_id")
+  fechaInicio           DateTime?          @map("fecha_inicio")
+  fechaFinalizacion     DateTime?          @map("fecha_finalizacion")
+  notas                 String?
+  
+  // Relaciones
+  receta                Receta             @relation(fields: [recetaId], references: [id])
+  usuarioResponsable    Usuario            @relation("UsuarioOrdenProduccion", fields: [usuarioResponsableId], references: [id])
+  lotesFabricacion      LoteFabricacion[]
+  
+  @@map("ordenes_produccion")
+}
+
+model LoteFabricacion {
+  id                  Int                   @id @default(autoincrement())
+  ordenProduccionId   Int                   @map("orden_produccion_id")
+  codigoLote          String                @map("codigo_lote")
+  estado              String                @default("En Preparación")
+  volumenObtenido     Decimal?              @map("volumen_obtenido")
+  rendimientoReal     Decimal?              @map("rendimiento_real")
+  fechaInicio         DateTime?             @map("fecha_inicio")
+  fechaFinalizacion   DateTime?             @map("fecha_finalizacion")
+  notas               String?
+  
+  // Relaciones
+  ordenProduccion     OrdenProduccion       @relation(fields: [ordenProduccionId], references: [id])
+  consumos            ConsumoMateriaPrima[]
+  parametros          ParametroProceso[]
+  lotesProducto       LoteProducto[]
+  
+  @@map("lotes_fabricacion")
+}
+
+model ConsumoMateriaPrima {
+  id                  Int               @id @default(autoincrement())
+  loteFabricacionId   Int               @map("lote_fabricacion_id")
+  materiaPrimaId      Int               @map("materia_prima_id")
+  loteMateriaPrimaId  Int               @map("lote_materia_prima_id")
+  cantidad            Decimal
+  unidadMedida        String            @map("unidad_medida")
+  etapaProduccion     String            @map("etapa_produccion")
+  fecha               DateTime          @default(now())
+  usuarioId           Int               @map("usuario_id")
+  notas               String?
+  
+  // Relaciones
+  loteFabricacion     LoteFabricacion   @relation(fields: [loteFabricacionId], references: [id], onDelete: Cascade)
+  materiaPrima        MateriaPrima      @relation(fields: [materiaPrimaId], references: [id])
+  loteMateriaPrima    LoteMateriaPrima  @relation(fields: [loteMateriaPrimaId], references: [id])
+  usuario             Usuario           @relation("UsuarioConsumoMateriaPrima", fields: [usuarioId], references: [id])
+  
+  @@map("consumo_materia_prima")
+}
+
+model ParametroProceso {
+  id                  Int               @id @default(autoincrement())
+  loteFabricacionId   Int               @map("lote_fabricacion_id")
+  etapaProduccion     String            @map("etapa_produccion")
+  parametro           String
+  valor               Decimal
+  unidadMedida        String            @map("unidad_medida")
+  fechaMedicion       DateTime          @default(now()) @map("fecha_medicion")
+  usuarioId           Int               @map("usuario_id")
+  enRango             Boolean           @default(true) @map("en_rango")
+  notas               String?
+  
+  // Relaciones
+  loteFabricacion     LoteFabricacion   @relation(fields: [loteFabricacionId], references: [id], onDelete: Cascade)
+  usuario             Usuario           @relation("UsuarioParametroProceso", fields: [usuarioId], references: [id])
+  
+  @@map("parametros_proceso")
+}
+
+model ControlCalidad {
+  id                  Int       @id @default(autoincrement())
+  referenciaId        Int       @map("referencia_id")
+  referenciaTipo      String    @map("referencia_tipo")
+  tipo                String
+  parametro           String
+  valor               Decimal
+  enEspecificacion    Boolean   @default(true) @map("en_especificacion")
+  fechaAnalisis       DateTime  @default(now()) @map("fecha_analisis")
+  usuarioId           Int       @map("usuario_id")
+  notas               String?
+  
+  // Relaciones
+  usuario             Usuario   @relation("UsuarioControlCalidad", fields: [usuarioId], references: [id])
+  
+  @@map("control_calidad")
+}
+
+model LoteProducto {
+  id                     Int                @id @default(autoincrement())
+  productoTerminadoId    Int                @map("producto_terminado_id")
+  codigoLote             String             @map("codigo_lote")
+  loteFabricacionId      Int                @map("lote_fabricacion_id")
+  fechaEnvasado          DateTime           @map("fecha_envasado")
+  fechaOptimoConsumo     DateTime?          @map("fecha_optimo_consumo")
+  fechaCaducidad         DateTime?          @map("fecha_caducidad")
+  cantidad               Decimal
+  cantidadDisponible     Decimal            @map("cantidad_disponible")
+  estado                 String             @default("Disponible")
+  ubicacionFisica        String?            @map("ubicacion_fisica")
+  notas                  String?
+  
+  // Relaciones
+  productoTerminado      ProductoTerminado  @relation(fields: [productoTerminadoId], references: [id])
+  loteFabricacion        LoteFabricacion    @relation(fields: [loteFabricacionId], references: [id])
+  detallesVenta          DetalleVenta[]
+  
+  @@map("lotes_producto")
+}
+
+// Módulo Comercial
+model Cliente {
+  id                  Int                   @id @default(autoincrement())
+  codigo              String
+  nombre              String
+  tipo                String
+  contacto            String?
+  telefono            String?
+  email               String?
+  direccion           String?
+  comuna              String?
+  ciudad              String?
+  listaPrecios        String?               @map("lista_precios")
+  condicionPago       String?               @map("condicion_pago")
+  estado              String                @default("Activo")
+  fechaRegistro       DateTime              @default(now()) @map("fecha_registro")
+  notas               String?
+  
+  // Relaciones
+  pedidos             Pedido[]
+  ventas              Venta[]
+  envasesRetornables  EnvaseRetornable[]
+  
+  @@map("clientes")
+}
+
+model Pedido {
+  id                        Int               @id @default(autoincrement())
+  codigo                    String
+  clienteId                 Int               @map("cliente_id")
+  fechaPedido               DateTime          @default(now()) @map("fecha_pedido")
+  fechaEntregaProgramada    DateTime?         @map("fecha_entrega_programada")
+  estado                    String            @default("Pendiente")
+  canal                     String
+  subtotal                  Decimal           @default(0)
+  descuento                 Decimal           @default(0)
+  impuestos                 Decimal           @default(0)
+  total                     Decimal           @default(0)
+  usuarioRegistroId         Int               @map("usuario_registro_id")
+  notas                     String?
+  
+  // Relaciones
+  cliente                   Cliente           @relation(fields: [clienteId], references: [id])
+  usuarioRegistro           Usuario           @relation("UsuarioPedido", fields: [usuarioRegistroId], references: [id])
+  detalles                  DetallePedido[]
+  ventas                    Venta[]
+  
+  @@map("pedidos")
+}
+
+model DetallePedido {
+  id                Int                @id @default(autoincrement())
+  pedidoId          Int                @map("pedido_id")
+  productoId        Int                @map("producto_id")
+  cantidad          Decimal
+  unidadMedida      String             @map("unidad_medida")
+  precioUnitario    Decimal            @map("precio_unitario")
+  descuento         Decimal            @default(0)
+  subtotal          Decimal
+  notas             String?
+  
+  // Relaciones
+  pedido            Pedido             @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  producto          ProductoTerminado  @relation(fields: [productoId], references: [id])
+  
+  @@map("detalles_pedido")
+}
+
+model Venta {
+  id                  Int                @id @default(autoincrement())
+  codigo              String
+  tipoDocumento       String             @map("tipo_documento")
+  numeroDocumento     String?            @map("numero_documento")
+  pedidoId            Int?               @map("pedido_id")
+  clienteId           Int                @map("cliente_id")
+  fechaVenta          DateTime           @default(now()) @map("fecha_venta")
+  canal               String
+  subtotal            Decimal            @default(0)
+  descuento           Decimal            @default(0)
+  impuestos           Decimal            @default(0)
+  total               Decimal            @default(0)
+  estado              String             @default("Pendiente")
+  metodoPago          String?            @map("metodo_pago")
+  usuarioRegistroId   Int                @map("usuario_registro_id")
+  notas               String?
+  
+  // Relaciones
+  pedido              Pedido?            @relation(fields: [pedidoId], references: [id])
+  cliente             Cliente            @relation(fields: [clienteId], references: [id])
+  usuarioRegistro     Usuario            @relation("UsuarioVenta", fields: [usuarioRegistroId], references: [id])
+  detalles            DetalleVenta[]
+  devoluciones        Devolucion[]
+  envasesRetornables  EnvaseRetornable[]
+  
+  @@map("ventas")
+}
+
+model DetalleVenta {
+  id                Int                 @id @default(autoincrement())
+  ventaId           Int                 @map("venta_id")
+  productoId        Int                 @map("producto_id")
+  loteProductoId    Int                 @map("lote_producto_id")
+  cantidad          Decimal
+  unidadMedida      String              @map("unidad_medida")
+  precioUnitario    Decimal             @map("precio_unitario")
+  descuento         Decimal             @default(0)
+  subtotal          Decimal
+  costo             Decimal?
+  margen            Decimal?
+  notas             String?
+  
+  // Relaciones
+  venta             Venta               @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  producto          ProductoTerminado   @relation(fields: [productoId], references: [id])
+  loteProducto      LoteProducto        @relation(fields: [loteProductoId], references: [id])
+  detallesDevoluciones DetalleDevolucion[]
+  
+  @@map("detalles_venta")
+}
+
+model Devolucion {
+  id                  Int                  @id @default(autoincrement())
+  ventaId             Int                  @map("venta_id")
+  fechaDevolucion     DateTime             @default(now()) @map("fecha_devolucion")
+  motivo              String
+  estado              String               @default("Pendiente")
+  usuarioRegistroId   Int                  @map("usuario_registro_id")
+  notas               String?
+  
+  // Relaciones
+  venta               Venta                @relation(fields: [ventaId], references: [id])
+  usuarioRegistro     Usuario              @relation("UsuarioDevolucion", fields: [usuarioRegistroId], references: [id])
+  detalles            DetalleDevolucion[]
+  
+  @@map("devoluciones")
+}
+
+model DetalleDevolucion {
+  id                 Int                 @id @default(autoincrement())
+  devolucionId       Int                 @map("devolucion_id")
+  detalleVentaId     Int                 @map("detalle_venta_id")
+  productoId         Int                 @map("producto_id")
+  cantidad           Decimal
+  motivo             String
+  afectaInventario   Boolean             @default(true) @map("afecta_inventario")
+  notas              String?
+  
+  // Relaciones
+  devolucion         Devolucion          @relation(fields: [devolucionId], references: [id], onDelete: Cascade)
+  detalleVenta       DetalleVenta        @relation(fields: [detalleVentaId], references: [id])
+  producto           ProductoTerminado   @relation(fields: [productoId], references: [id])
+  
+  @@map("detalles_devolucion")
+}
+
+model EnvaseRetornable {
+  id                      Int       @id @default(autoincrement())
+  codigo                  String
+  tipo                    String
+  capacidad               Decimal
+  unidadMedida            String    @map("unidad_medida")
+  estado                  String    @default("Disponible")
+  clienteId               Int?      @map("cliente_id")
+  ventaId                 Int?      @map("venta_id")
+  fechaSalida             DateTime? @map("fecha_salida")
+  fechaRetornoEstimada    DateTime? @map("fecha_retorno_estimada")
+  fechaRetornoReal        DateTime? @map("fecha_retorno_real")
+  notas                   String?
+  
+  // Relaciones
+  cliente                 Cliente?  @relation(fields: [clienteId], references: [id])
+  venta                   Venta?    @relation(fields: [ventaId], references: [id])
+  
+  @@map("envases_retornables")
+}
