@@ -21,7 +21,7 @@ if (!globalThis.prisma) {
   if (process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV !== 'production') {
     prisma.$connect()
       .then(() => {
-        logger.info('Conexión a la base de datos establecida correctamente');
+        logger.info({}, 'Conexión a la base de datos establecida correctamente');
       })
       .catch((error: Error) => {
         logger.error({ error }, 'Error al conectar con la base de datos');
@@ -38,7 +38,7 @@ if (!globalThis.prisma) {
 
   // Single handler for graceful shutdown
   const handleShutdown = async (signal: string) => {
-    logger.info(`Cerrando conexión a la base de datos debido a ${signal}`);
+    logger.info({ signal }, 'Cerrando conexión a la base de datos');
     await prisma.$disconnect();
     process.exit(0);
   };
