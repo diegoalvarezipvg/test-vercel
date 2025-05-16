@@ -16,15 +16,15 @@ class Logger {
     this.isDevelopment = process.env.NODE_ENV === 'development';
   }
 
-  private formatMessage(level: LogLevel, message: string, meta?: Record<string, unknown>): string {
+  private formatMessage(level: LogLevel, meta: Record<string, unknown>, message: string): string {
     const timestamp = new Date().toISOString();
-    const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
+    const metaStr = Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : '';
     return `[${timestamp}] ${level.toUpperCase()} [${this.service}]: ${message}${metaStr}`;
   }
 
-  private log(level: LogLevel, message: string, meta?: Record<string, unknown>) {
+  private log(level: LogLevel, meta: Record<string, unknown>, message: string) {
     if (this.shouldLog(level)) {
-      const formattedMessage = this.formatMessage(level, message, meta);
+      const formattedMessage = this.formatMessage(level, meta, message);
       
       switch (level) {
         case 'error':
@@ -49,20 +49,20 @@ class Logger {
     return levels.indexOf(level) >= levels.indexOf(this.level);
   }
 
-  debug(message: string, meta?: Record<string, unknown>) {
-    this.log('debug', message, meta);
+  debug(meta: Record<string, unknown>, message: string) {
+    this.log('debug', meta, message);
   }
 
-  info(message: string, meta?: Record<string, unknown>) {
-    this.log('info', message, meta);
+  info(meta: Record<string, unknown>, message: string) {
+    this.log('info', meta, message);
   }
 
-  warn(message: string, meta?: Record<string, unknown>) {
-    this.log('warn', message, meta);
+  warn(meta: Record<string, unknown>, message: string) {
+    this.log('warn', meta, message);
   }
 
-  error(message: string, meta?: Record<string, unknown>) {
-    this.log('error', message, meta);
+  error(meta: Record<string, unknown>, message: string) {
+    this.log('error', meta, message);
   }
 }
 
