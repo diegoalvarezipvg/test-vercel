@@ -3,47 +3,49 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('prismaClient');
 
-// Declaramos prisma fuera de la función para que sea un singleton global
-let prisma: PrismaClient;
-
-function getPrismaClient(): PrismaClient {
-  if (!prisma) {
-    logger.info('Inicializando nueva conexión de PrismaClient');
-    prisma = new PrismaClient({
-      log: ['query', 'info', 'warn', 'error'],
-    });
-
-    // Solo conectar a la base de datos si no estamos en build time
-    if (process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV !== 'production') {
-      prisma.$connect()
-        .then(() => {
-          logger.info('Conexión a la base de datos establecida correctamente');
-        })
-        .catch((error: Error) => {
-          logger.error({ error }, 'Error al conectar con la base de datos');
-        });
-    }
-
-    // Gestión de errores no manejados en Node.js
-    process.on('unhandledRejection', (error) => {
-      logger.error({ error }, 'Error no manejado en promesa detectado');
-    });
-
-    // Cierre correcto de la conexión al terminar la aplicación
-    process.on('SIGINT', async () => {
-      logger.info('Cerrando conexión a la base de datos debido a SIGINT');
-      await prisma.$disconnect();
-      process.exit(0);
-    });
-
-    process.on('SIGTERM', async () => {
-      logger.info('Cerrando conexión a la base de datos debido a SIGTERM');
-      await prisma.$disconnect();
-      process.exit(0);
-    });
-  }
-
-  return prisma;
+// Global variable to store the PrismaClient instance
+declare global {
+  var prisma: PrismaClient | undefined;
 }
 
-export default getPrismaClient(); 
+// Use globalThis to ensure singleton across hot reloads in development
+const prisma = globalThis.prisma || new PrismaClient({
+  log: ['query', 'info', 'warn', 'error'],
+});
+
+// Only set the global instance if it doesn't exist
+if (!globalThis.prisma) {
+  globalThis.prisma = prisma;
+
+  // Only add event listeners once
+  if (process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV !== 'production') {
+    prisma.$connect()
+      .then(() => {
+        logger.info('Conexión a la base de datos establecida correctamente');
+      })
+      .catch((error: Error) => {
+        logger.error({ error }, 'Error al conectar con la base de datos');
+      });
+  }
+
+  // Set max listeners to a higher value to prevent warnings
+  process.setMaxListeners(20);
+
+  // Single error handler for unhandled rejections
+  process.on('unhandledRejection', (error) => {
+    logger.error({ error }, 'Error no manejado en promesa detectado');
+  });
+
+  // Single handler for graceful shutdown
+  const handleShutdown = async (signal: string) => {
+    logger.info(`Cerrando conexión a la base de datos debido a ${signal}`);
+    await prisma.$disconnect();
+    process.exit(0);
+  };
+
+  // Add shutdown handlers
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+}
+
+export default prisma; 
