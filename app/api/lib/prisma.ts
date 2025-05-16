@@ -13,14 +13,16 @@ function getPrismaClient(): PrismaClient {
       log: ['query', 'info', 'warn', 'error'],
     });
 
-    // Gestión de eventos de conexión
-    prisma.$connect()
-      .then(() => {
-        logger.info('Conexión a la base de datos establecida correctamente');
-      })
-      .catch((error) => {
-        logger.error({ error }, 'Error al conectar con la base de datos');
-      });
+    // Solo conectar a la base de datos si no estamos en build time
+    if (process.env.NODE_ENV !== 'production' || process.env.VERCEL_ENV !== 'production') {
+      prisma.$connect()
+        .then(() => {
+          logger.info('Conexión a la base de datos establecida correctamente');
+        })
+        .catch((error: Error) => {
+          logger.error({ error }, 'Error al conectar con la base de datos');
+        });
+    }
 
     // Gestión de errores no manejados en Node.js
     process.on('unhandledRejection', (error) => {
