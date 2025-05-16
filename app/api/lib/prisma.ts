@@ -1,53 +1,47 @@
 import { PrismaClient } from '@prisma/client';
 import { createLogger } from '../utils/logger';
 
-const logger = createLogger('prisma');
+const logger = createLogger('prismaClient');
 
-// Prevent multiple instances of Prisma Client in development
-declare global {
-  var prisma: PrismaClient | undefined
+// Declaramos prisma fuera de la función para que sea un singleton global
+let prisma: PrismaClient;
+
+function getPrismaClient(): PrismaClient {
+  if (!prisma) {
+    logger.info('Inicializando nueva conexión de PrismaClient');
+    prisma = new PrismaClient({
+      log: ['query', 'info', 'warn', 'error'],
+    });
+
+    // Gestión de eventos de conexión
+    prisma.$connect()
+      .then(() => {
+        logger.info('Conexión a la base de datos establecida correctamente');
+      })
+      .catch((error) => {
+        logger.error({ error }, 'Error al conectar con la base de datos');
+      });
+
+    // Gestión de errores no manejados en Node.js
+    process.on('unhandledRejection', (error) => {
+      logger.error({ error }, 'Error no manejado en promesa detectado');
+    });
+
+    // Cierre correcto de la conexión al terminar la aplicación
+    process.on('SIGINT', async () => {
+      logger.info('Cerrando conexión a la base de datos debido a SIGINT');
+      await prisma.$disconnect();
+      process.exit(0);
+    });
+
+    process.on('SIGTERM', async () => {
+      logger.info('Cerrando conexión a la base de datos debido a SIGTERM');
+      await prisma.$disconnect();
+      process.exit(0);
+    });
+  }
+
+  return prisma;
 }
 
-const prisma = global.prisma || new PrismaClient({
-  log: [
-    {
-      emit: 'event',
-      level: 'query',
-    },
-    {
-      emit: 'event',
-      level: 'error',
-    },
-    {
-      emit: 'event',
-      level: 'info',
-    },
-    {
-      emit: 'event',
-      level: 'warn',
-    },
-  ],
-});
-
-// Log Prisma events
-prisma.$on('query', (e: { query: string; params: string; duration: number }) => {
-  logger.debug({ query: e.query, params: e.params, duration: e.duration }, 'Prisma Query');
-});
-
-prisma.$on('error', (e: { message: string }) => {
-  logger.error({ error: e.message }, 'Prisma Error');
-});
-
-prisma.$on('info', (e: { message: string }) => {
-  logger.info({ message: e.message }, 'Prisma Info');
-});
-
-prisma.$on('warn', (e: { message: string }) => {
-  logger.warn({ message: e.message }, 'Prisma Warning');
-});
-
-if (process.env.NODE_ENV !== 'production') {
-  global.prisma = prisma;
-}
-
-export default prisma; 
+export default getPrismaClient(); 

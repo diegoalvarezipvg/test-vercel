@@ -1,24 +1,18 @@
 import pino from 'pino';
 
-// Create a basic logger without worker threads
-const createLogger = (name: string) => {
+export const createLogger = (service: string) => {
   return pino({
-    name,
-    level: process.env.LOG_LEVEL || 'info',
-    browser: {
-      write: {
-        info: (...args) => console.log(...args),
-        error: (...args) => console.error(...args),
-        warn: (...args) => console.warn(...args),
-        debug: (...args) => console.debug(...args),
-        trace: (...args) => console.trace(...args),
+    level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'SYS:standard',
+        ignore: 'pid,hostname',
       },
     },
-    // Disable worker threads
-    transport: undefined,
-    // Use basic timestamp
-    timestamp: () => `,"time":"${new Date().toISOString()}"`,
+    base: {
+      service,
+    },
   });
 };
-
-export { createLogger };
